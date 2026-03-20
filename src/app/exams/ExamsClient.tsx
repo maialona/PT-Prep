@@ -37,6 +37,7 @@ export function ExamsClient({ initialExams }: Props) {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ count: number } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [importedCount, setImportedCount] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Exam viewer state
@@ -73,6 +74,7 @@ export function ExamsClient({ initialExams }: Props) {
     setUploading(true);
     setUploadError(null);
     setUploadResult(null);
+    setImportedCount(0);
 
     try {
       const formData = new FormData();
@@ -85,15 +87,41 @@ export function ExamsClient({ initialExams }: Props) {
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "上傳失敗");
+      if (!res.ok || !res.body) {
+        const data = await res.json();
+        throw new Error(data.error || "上傳失敗");
+      }
 
-      setUploadResult({ count: data.questionsImported });
-      setSelectedFile(null);
-      setYear("");
-      setSubject("");
-      if (fileRef.current) fileRef.current.value = "";
-      router.refresh();
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+
+          if (event.type === "progress") {
+            setImportedCount(event.count);
+          } else if (event.type === "done") {
+            setUploadResult({ count: event.questionsImported });
+            setSelectedFile(null);
+            setYear("");
+            setSubject("");
+            if (fileRef.current) fileRef.current.value = "";
+            router.refresh();
+          } else if (event.type === "error") {
+            throw new Error(event.message);
+          }
+        }
+      }
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "上傳失敗");
     } finally {
@@ -191,7 +219,7 @@ export function ExamsClient({ initialExams }: Props) {
               {uploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  AI 解析中...（可能需要數十秒）
+                  AI 解析中...
                 </>
               ) : (
                 <>
@@ -200,6 +228,11 @@ export function ExamsClient({ initialExams }: Props) {
                 </>
               )}
             </Button>
+            {uploading && importedCount > 0 && (
+              <p className="text-sm text-muted-foreground">
+                已解析 {importedCount} 題...
+              </p>
+            )}
             {uploadResult && (
               <p className="flex items-center gap-1 text-sm text-green-600">
                 <CheckCircle className="h-4 w-4" />

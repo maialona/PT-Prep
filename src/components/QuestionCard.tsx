@@ -18,7 +18,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
-import { toggleBookmark, deleteQuestion, updateCorrectAnswer, addTag, removeTag } from "@/lib/actions";
+import { toggleBookmark, deleteQuestion, updateCorrectAnswer, addTag, removeTag, generateExplanation } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -47,6 +47,8 @@ export function QuestionCard({ question, defaultCollapsed = false }: QuestionCar
   const [tags, setTags] = useState<string[]>(question.tags ?? []);
   const [showTagInput, setShowTagInput] = useState(false);
   const [newTag, setNewTag] = useState("");
+  const [explanation, setExplanation] = useState(question.explanation ?? "");
+  const [generatingExplanation, setGeneratingExplanation] = useState(false);
   const router = useRouter();
   const { openChat } = useChat();
 
@@ -58,7 +60,7 @@ export function QuestionCard({ question, defaultCollapsed = false }: QuestionCar
       content: question.content,
       options,
       correctAnswer: answer,
-      explanation: question.explanation,
+      explanation: explanation || null,
       category: question.category.name,
     });
   }
@@ -221,11 +223,29 @@ export function QuestionCard({ question, defaultCollapsed = false }: QuestionCar
             </div>
 
             <div className="space-y-3 rounded-lg bg-muted/50 p-3">
-              {question.explanation && (
+              {explanation ? (
                 <div>
                   <p className="mb-1 text-xs font-semibold text-muted-foreground">解析</p>
-                  <p className="text-sm leading-relaxed">{question.explanation}</p>
+                  <p className="text-sm leading-relaxed">{explanation}</p>
                 </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  disabled={generatingExplanation}
+                  onClick={async () => {
+                    setGeneratingExplanation(true);
+                    try {
+                      const result = await generateExplanation(question.id);
+                      setExplanation(result);
+                    } finally {
+                      setGeneratingExplanation(false);
+                    }
+                  }}
+                >
+                  {generatingExplanation ? "生成中..." : "生成解析"}
+                </Button>
               )}
               <Button
                 variant="outline"

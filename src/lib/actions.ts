@@ -2,37 +2,17 @@
 
 import { prisma } from "@/lib/db";
 import { openai, SYSTEM_PROMPT } from "@/lib/openai";
-
-interface ExtractedQuestion {
-  content: string;
-  options: Record<string, string>;
-  correctAnswer: string;
-  explanation: string;
-  category: string;
-}
+import { splitTextIntoChunks, extractQuestionsFromChunk } from "@/lib/parseQuestions";
 
 export async function extractQuestions(rawText: string, examId?: string) {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `請解析以下所有題目（共有多題，請全部解析，不要遺漏任何一題）：\n\n${rawText}`,
-      },
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.2,
-    max_tokens: 16384,
-  });
+  // Split into chunks to avoid max_tokens truncation
+  const chunks = splitTextIntoChunks(rawText, 20);
 
-  const text = response.choices[0]?.message?.content;
-  if (!text) throw new Error("AI 未回傳任何結果");
+  // Process all chunks in parallel
+  const chunkResults = await Promise.all(chunks.map(extractQuestionsFromChunk));
+  const allQuestions = chunkResults.flat();
 
-  const parsed = JSON.parse(text);
-  const questions: ExtractedQuestion[] = Array.isArray(parsed)
-    ? parsed
-    : parsed.questions ?? [parsed];
+  const questions = allQuestions;
 
   const results = [];
 
@@ -66,6 +46,43 @@ export async function extractQuestions(rawText: string, examId?: string) {
   }
 
   return results;
+}
+
+export async function generateExplanation(questionId: string): Promise<string> {
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+    include: { category: true },
+  });
+  if (!question) throw new Error("題目不存在");
+
+  const questionText = `題目：${question.content}\n選項：\n${Object.entries(question.options as Record<string, string>).map(([k, v]) => `${k}. ${v}`).join("\n")}\n答案：${question.correctAnswer}`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: `請為以下題目生成詳細解析：\n\n${questionText}` },
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.2,
+    max_tokens: 1024,
+  });
+
+  const text = response.choices[0]?.message?.content;
+  if (!text) throw new Error("AI 未返回解析");
+
+  const parsed = JSON.parse(text);
+  const explanation: string =
+    parsed.explanation ??
+    parsed.questions?.[0]?.explanation ??
+    "";
+
+  await prisma.question.update({
+    where: { id: questionId },
+    data: { explanation },
+  });
+
+  return explanation;
 }
 
 // --- Exam Management ---

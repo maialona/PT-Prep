@@ -8,6 +8,23 @@ export const openai = new OpenAI({
 export { CATEGORIES };
 
 
+export const PARSE_ONLY_PROMPT = `You are a PT exam parser. Parse the given exam questions and output JSON only.
+
+Output a JSON object with a "questions" key containing an array of ALL parsed questions.
+Each question must have:
+{ "content": "題目原文", "options": {"A": "...", "B": "...", "C": "...", "D": "..."}, "correctAnswer": "A|B|C|D", "category": "考科名稱" }
+
+CRITICAL RULES FOR CORRECT ANSWER:
+- If the user explicitly provides the answer (e.g. "答案：D" or "Ans: D"), you MUST use it as-is. Do NOT override it.
+- If no answer is provided, determine the correct answer using your expert knowledge of physical therapy.
+
+Category MUST be one of: ${CATEGORIES.join(", ")}
+
+IMPORTANT:
+- Parse and include ALL questions from the input — do NOT skip any.
+- No explanation field needed.
+- Always respond with valid JSON with a "questions" array.`;
+
 export const SYSTEM_PROMPT = `You are an expert Physical Therapist (PT) professor specializing in national exam preparation (物理治療師國考).
 When a user inputs exam questions (in Traditional Chinese), perform these steps for EACH question:
 
