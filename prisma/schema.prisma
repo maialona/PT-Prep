@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id              String           @id @default(uuid())
+  name            String           @unique
+  questions       Question[]
+  knowledgePoints KnowledgePoint[]
+}
+
+model Question {
+  id              String              @id @default(uuid())
+  content         String
+  options         Json // { A: "...", B: "...", C: "...", D: "..." }
+  correctAnswer   String              @map("correct_answer")
+  explanation     String?
+  categoryId      String              @map("category_id")
+  category        Category            @relation(fields: [categoryId], references: [id])
+  isBookmarked    Boolean             @default(false) @map("is_bookmarked")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  nextReviewAt    DateTime?           @map("next_review_at")
+  easeFactor      Float               @default(2.5) @map("ease_factor")
+  srsInterval     Int                 @default(0) @map("srs_interval")
+  repetitions     Int                 @default(0)
+  tags            String[]            @default([])
+  knowledgePoints QuestionKnowledge[]
+  attempts        PracticeAttempt[]
+
+  @@map("questions")
+}
+
+model PracticeAttempt {
+  id         String   @id @default(uuid())
+  questionId String   @map("question_id")
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selected   String
+  isCorrect  Boolean  @map("is_correct")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("practice_attempts")
+}
+
+model KnowledgePoint {
+  id          String              @id @default(uuid())
+  title       String
+  description String
+  categoryId  String              @map("category_id")
+  category    Category            @relation(fields: [categoryId], references: [id])
+  questions   QuestionKnowledge[]
+
+  @@map("knowledge_points")
+}
+
+model QuestionKnowledge {
+  questionId  String         @map("question_id")
+  knowledgeId String         @map("knowledge_id")
+  question    Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  knowledge   KnowledgePoint @relation(fields: [knowledgeId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, knowledgeId])
+  @@map("question_knowledge")
+}
+
+model Note {
+  id         String   @id @default(uuid())
+  title      String
+  content    String
+  category   String
+  questionId String?  @map("question_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("notes")
+}
+
+model Image {
+  id        String   @id @default(uuid())
+  title     String
+  category  String
+  data      String   // base64 data URL
+  source    String   // "chat" | "upload"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("images")
+}
