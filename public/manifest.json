@@ -1,20 +1,20 @@
 {
-  "name": "A&P 知識萃取系統",
-  "short_name": "A&P",
-  "description": "解剖生理學考題知識萃取與複習系統",
+  "name": "PT-Prep 物理治療國考",
+  "short_name": "PT-Prep",
+  "description": "物理治療師國考題庫與解析系統",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "/PWA192x192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512x512.png",
+      "src": "/PWA512x512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

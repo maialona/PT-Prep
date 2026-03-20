@@ -24,7 +24,7 @@ import {
 interface Category {
   id: string;
   name: string;
-  _count: { questions: number; knowledgePoints: number };
+  _count: { questions: number };
 }
 
 interface Question {
@@ -34,14 +34,20 @@ interface Question {
   correctAnswer: string;
   explanation: string | null;
   category: { name: string };
-  knowledgePoints: { knowledge: { title: string; description: string } }[];
 }
 
 type Phase = "setup" | "quiz" | "result";
 
-export function PracticeClient({ categories }: { categories: Category[] }) {
+export function PracticeClient({
+  categories,
+  years,
+}: {
+  categories: Category[];
+  years: number[];
+}) {
   const [phase, setPhase] = useState<Phase>("setup");
   const [categoryId, setCategoryId] = useState<string>("all");
+  const [year, setYear] = useState<string>("all");
   const [count, setCount] = useState("10");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [current, setCurrent] = useState(0);
@@ -56,10 +62,11 @@ export function PracticeClient({ categories }: { categories: Category[] }) {
     try {
       const qs = await getPracticeQuestions(
         categoryId === "all" ? undefined : categoryId,
+        year === "all" ? undefined : parseInt(year),
         parseInt(count)
       );
       if (qs.length === 0) {
-        alert("此分類尚無題目，請先匯入題目");
+        alert("此分類/年度尚無題目，請先匯入題目");
         return;
       }
       setQuestions(qs as Question[]);
@@ -116,21 +123,40 @@ export function PracticeClient({ categories }: { categories: Category[] }) {
             <CardTitle>設定練習</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">選擇分類</label>
-              <Select value={categoryId} onValueChange={setCategoryId}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部分類</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name} ({cat._count.questions} 題)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">選擇分類</label>
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部分類</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name} ({cat._count.questions} 題)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">選擇年度</label>
+                <Select value={year} onValueChange={setYear}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">全部年度</SelectItem>
+                    {years.map((y) => (
+                      <SelectItem key={y} value={y.toString()}>
+                        {y} 年
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -268,16 +294,6 @@ export function PracticeClient({ categories }: { categories: Category[] }) {
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {q.explanation}
               </p>
-            )}
-            {q.knowledgePoints.length > 0 && (
-              <div className="space-y-1.5">
-                {q.knowledgePoints.map((kp, i) => (
-                  <div key={i} className="rounded-md bg-muted p-2.5 text-xs">
-                    <span className="font-medium">{kp.knowledge.title}</span>
-                    <span className="text-muted-foreground">：{kp.knowledge.description}</span>
-                  </div>
-                ))}
-              </div>
             )}
             <Button onClick={handleNext} className="w-full">
               {current + 1 >= questions.length ? "查看結果" : "下一題"}

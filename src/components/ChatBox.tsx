@@ -32,7 +32,6 @@ export function ChatBox() {
   } = useChat();
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -43,38 +42,7 @@ export function ChatBox() {
     }
   }, [messages]);
 
-  const isBusy = isLoading || isGeneratingImage;
-
-  async function handleGenerateImage() {
-    const text = input.trim();
-    if (!text || isBusy) return;
-
-    setInput("");
-    addMessage({ role: "user", content: `[產生圖片] ${text}` });
-    setIsGeneratingImage(true);
-
-    try {
-      const res = await fetch("/api/chat/image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: text,
-          questionContext: questionContext ?? undefined,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.imageUrl) {
-        addMessage({ role: "assistant", content: text, imageUrl: data.imageUrl });
-      } else {
-        addMessage({ role: "assistant", content: `圖片產生失敗：${data.error ?? "未知錯誤"}` });
-      }
-    } catch {
-      addMessage({ role: "assistant", content: "圖片產生失敗，請稍後再試。" });
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  }
+  const isBusy = isLoading;
 
   async function handleSend() {
     const text = input.trim();
@@ -129,7 +97,7 @@ export function ChatBox() {
             )}
           </div>
           <SheetDescription>
-            {questionContext ? "針對題目提問" : "通用解剖生理學提問"}
+            {questionContext ? "針對題目提問" : "通用物理治療國考問題提問"}
           </SheetDescription>
         </SheetHeader>
 
@@ -150,7 +118,7 @@ export function ChatBox() {
                 <p className="text-center text-sm text-muted-foreground py-8">
                   {questionContext
                     ? "針對這道題目有什麼不懂的嗎？問我吧！"
-                    : "有任何解剖生理學的問題嗎？問我吧！"}
+                    : "有任何關於物理治療師國考的問題嗎？問我吧！"}
                 </p>
               )}
               {messages.map((msg, i) => (
@@ -165,52 +133,8 @@ export function ChatBox() {
                         : "bg-muted"
                     }`}
                   >
-                    {msg.imageUrl ? (
-                      <div className="space-y-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={msg.imageUrl}
-                          alt={msg.content}
-                          className="rounded-md w-full cursor-zoom-in"
-                          onClick={() => setLightboxUrl(msg.imageUrl!)}
-                        />
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground flex-1 min-w-0 truncate">{msg.content}</p>
-                          <div className="flex shrink-0 gap-0.5">
-                            <button
-                              onClick={async () => {
-                                const res = await fetch("/api/images", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    title: msg.content,
-                                    data: msg.imageUrl,
-                                    source: "chat",
-                                  }),
-                                });
-                                if (res.ok) setSavedIds((prev) => new Set(prev).add(i));
-                              }}
-                              disabled={savedIds.has(i)}
-                              className="rounded-md p-1 hover:bg-background/50 transition-colors disabled:opacity-50"
-                              title={savedIds.has(i) ? "已存到圖庫" : "存到圖庫"}
-                            >
-                              <FolderDown className={`h-3.5 w-3.5 ${savedIds.has(i) ? "text-green-500" : "text-muted-foreground"}`} />
-                            </button>
-                            <a
-                              href={msg.imageUrl}
-                              download={`${msg.content.replace(/\s+/g, "_")}.png`}
-                              className="rounded-md p-1 hover:bg-background/50 transition-colors"
-                              title="下載圖片"
-                            >
-                              <Download className="h-3.5 w-3.5 text-muted-foreground" />
-                            </a>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      msg.content
-                    )}
-                    {!msg.imageUrl && msg.role === "assistant" && msg.content && !isLoading && (
+                    {msg.content}
+                    {msg.role === "assistant" && msg.content && !isLoading && (
                       <button
                         onClick={async () => {
                           try {
@@ -243,14 +167,6 @@ export function ChatBox() {
                   </div>
                 </div>
               ))}
-              {isGeneratingImage && (
-                <div className="flex justify-start">
-                  <div className="rounded-lg bg-muted px-3 py-2 flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    圖片產生中...
-                  </div>
-                </div>
-              )}
               {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
                 <div className="flex justify-start">
                   <div className="rounded-lg bg-muted px-3 py-2">
@@ -277,20 +193,6 @@ export function ChatBox() {
               disabled={isBusy}
               className="flex-1"
             />
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              disabled={isBusy || !input.trim()}
-              onClick={handleGenerateImage}
-              title="產生圖片"
-            >
-              {isGeneratingImage ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ImageIcon className="h-4 w-4" />
-              )}
-            </Button>
             <Button type="submit" size="icon" disabled={isBusy || !input.trim()}>
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

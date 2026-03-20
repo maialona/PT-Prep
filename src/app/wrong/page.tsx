@@ -43,9 +43,6 @@ export default async function WrongPage() {
                 question={{
                   ...q,
                   options: q.options as Record<string, string>,
-                  knowledgePoints: q.knowledgePoints.map((qk) => ({
-                    knowledge: qk.knowledge,
-                  })),
                 }}
               />
             ) : null

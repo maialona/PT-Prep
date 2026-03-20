@@ -17,16 +17,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "A&P 知識萃取系統",
-  description: "解剖生理學考題知識萃取與複習系統",
+  title: "PT-Prep 物理治療國考",
+  description: "物理治療師國考題庫與解析系統",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "A&P",
+    title: "PT-Prep",
   },
   icons: {
-    apple: "/icon-192x192.png",
+    icon: "/PWA192x192.png",
+    apple: "/PWA192x192.png",
   },
 };
 

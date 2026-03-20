@@ -17,16 +17,16 @@ import { FileDown, Loader2, Printer } from "lucide-react";
 interface Category {
   id: string;
   name: string;
-  _count: { questions: number; knowledgePoints: number };
+  _count: { questions: number };
 }
 
 interface Question {
+  id: string;
   content: string;
   options: unknown;
   correctAnswer: string;
   explanation: string | null;
   category: { name: string };
-  knowledgePoints: { knowledge: { title: string; description: string } }[];
 }
 
 interface Note {
@@ -178,7 +178,6 @@ function buildPrintHtml(
         ? `<div style="margin-top:8px;padding:8px;background:#f3f4f6;border-radius:4px;font-size:12px;">
             <strong>答案：${q.correctAnswer}</strong>
             ${q.explanation ? `<div style="margin-top:4px;color:#6b7280;">${q.explanation}</div>` : ""}
-            ${q.knowledgePoints.length > 0 ? `<div style="margin-top:4px;border-top:1px solid #e5e7eb;padding-top:4px;">${q.knowledgePoints.map((kp) => `<div><strong>${kp.knowledge.title}</strong>：${kp.knowledge.description}</div>`).join("")}</div>` : ""}
           </div>`
         : "";
 
@@ -206,7 +205,7 @@ function buildPrintHtml(
 <html>
 <head>
   <meta charset="utf-8">
-  <title>A&P 知識萃取 — ${categoryName}</title>
+  <title>PT-Prep 物理治療國考 — ${categoryName}</title>
   <style>
     body { font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; color: #1f2937; }
     h1 { font-size: 20px; border-bottom: 2px solid #1f2937; padding-bottom: 8px; }
@@ -215,7 +214,7 @@ function buildPrintHtml(
   </style>
 </head>
 <body>
-  <h1>A&P 知識萃取 — ${categoryName}</h1>
+  <h1>PT-Prep 物理治療國考 — ${categoryName}</h1>
   ${questions.length > 0 ? `<h2>題目（共 ${questions.length} 題）</h2>${questionsHtml}` : ""}
   ${notes.length > 0 ? `<h2>AI 筆記（共 ${notes.length} 篇）</h2>${notesHtml}` : ""}
 </body>

@@ -9,10 +9,9 @@ interface ExtractedQuestion {
   correctAnswer: string;
   explanation: string;
   category: string;
-  knowledgePoints: { title: string; description: string }[];
 }
 
-export async function extractQuestions(rawText: string) {
+export async function extractQuestions(rawText: string, examId?: string) {
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
@@ -56,47 +55,59 @@ export async function extractQuestions(rawText: string) {
         correctAnswer: q.correctAnswer,
         explanation: q.explanation,
         categoryId: category.id,
+        ...(examId ? { examId } : {}),
       },
     });
-
-    for (const kp of q.knowledgePoints) {
-      let knowledgePoint = await prisma.knowledgePoint.findFirst({
-        where: { title: kp.title, categoryId: category.id },
-      });
-
-      if (!knowledgePoint) {
-        knowledgePoint = await prisma.knowledgePoint.create({
-          data: {
-            title: kp.title,
-            description: kp.description,
-            categoryId: category.id,
-          },
-        });
-      }
-
-      await prisma.questionKnowledge.create({
-        data: {
-          questionId: question.id,
-          knowledgeId: knowledgePoint.id,
-        },
-      });
-    }
 
     results.push({
       ...question,
       category: category.name,
-      knowledgePoints: q.knowledgePoints,
     });
   }
 
   return results;
 }
 
+// --- Exam Management ---
+export async function getExams() {
+  return prisma.exam.findMany({
+    orderBy: [{ year: "desc" }, { subject: "asc" }],
+    include: {
+      _count: { select: { questions: true } },
+    },
+  });
+}
+
+export async function getExamYears() {
+  const exams = await prisma.exam.findMany({
+    select: { year: true },
+    distinct: ["year"],
+    orderBy: { year: "desc" },
+  });
+  return exams.map((e) => e.year);
+}
+
+
+export async function getExamQuestions(examId: string) {
+  return prisma.question.findMany({
+    where: { examId },
+    include: { category: true },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export async function deleteExam(examId: string) {
+  // Delete associated questions first, then the exam
+  await prisma.question.deleteMany({ where: { examId } });
+  return prisma.exam.delete({ where: { id: examId } });
+}
+
+
 export async function getCategories() {
   return prisma.category.findMany({
     orderBy: { name: "asc" },
     include: {
-      _count: { select: { questions: true, knowledgePoints: true } },
+      _count: { select: { questions: true } },
     },
   });
 }
@@ -106,9 +117,6 @@ export async function getQuestionsByCategory(categoryId: string) {
     where: { categoryId },
     include: {
       category: true,
-      knowledgePoints: {
-        include: { knowledge: true },
-      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -118,9 +126,6 @@ export async function getAllQuestions() {
   return prisma.question.findMany({
     include: {
       category: true,
-      knowledgePoints: {
-        include: { knowledge: true },
-      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -132,23 +137,10 @@ export async function searchQuestions(query: string) {
       OR: [
         { content: { contains: query, mode: "insensitive" } },
         { explanation: { contains: query, mode: "insensitive" } },
-        {
-          knowledgePoints: {
-            some: {
-              knowledge: {
-                OR: [
-                  { title: { contains: query, mode: "insensitive" } },
-                  { description: { contains: query, mode: "insensitive" } },
-                ],
-              },
-            },
-          },
-        },
       ],
     },
     include: {
       category: true,
-      knowledgePoints: { include: { knowledge: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -203,12 +195,21 @@ export async function deleteNote(noteId: string) {
   return prisma.note.delete({ where: { id: noteId } });
 }
 
-export async function getPracticeQuestions(categoryId?: string, count = 10) {
+export async function getPracticeQuestions(
+  categoryId?: string,
+  year?: number,
+  count = 10
+) {
   const questions = await prisma.question.findMany({
-    where: categoryId ? { categoryId } : undefined,
+    where: {
+      AND: [
+        categoryId ? { categoryId } : {},
+        year ? { exam: { year } } : {},
+      ],
+    },
     include: {
       category: true,
-      knowledgePoints: { include: { knowledge: true } },
+      exam: true,
     },
   });
   // Shuffle and take `count`
@@ -227,39 +228,6 @@ export async function submitAnswer(questionId: string, selected: string) {
   await prisma.practiceAttempt.create({
     data: { questionId, selected, isCorrect },
   });
-
-  // SM-2 Spaced Repetition update
-  const now = new Date();
-  if (isCorrect) {
-    const newReps = question.repetitions + 1;
-    let newInterval: number;
-    if (newReps === 1) newInterval = 1;
-    else if (newReps === 2) newInterval = 6;
-    else newInterval = Math.round(question.srsInterval * question.easeFactor);
-
-    const newEase = Math.max(1.3, question.easeFactor + 0.1 - 0.08 - 0.02);
-
-    await prisma.question.update({
-      where: { id: questionId },
-      data: {
-        repetitions: newReps,
-        srsInterval: newInterval,
-        easeFactor: newEase,
-        nextReviewAt: new Date(now.getTime() + newInterval * 86400000),
-      },
-    });
-  } else {
-    const newEase = Math.max(1.3, question.easeFactor - 0.2);
-    await prisma.question.update({
-      where: { id: questionId },
-      data: {
-        repetitions: 0,
-        srsInterval: 1,
-        easeFactor: newEase,
-        nextReviewAt: new Date(now.getTime() + 86400000), // tomorrow
-      },
-    });
-  }
 
   return { isCorrect, correctAnswer: question.correctAnswer };
 }
@@ -286,7 +254,6 @@ export async function getWrongQuestions() {
     where: { id: { in: uniqueIds } },
     include: {
       category: true,
-      knowledgePoints: { include: { knowledge: true } },
       attempts: { orderBy: { createdAt: "desc" }, take: 5 },
     },
   });
@@ -302,45 +269,11 @@ export async function getPracticeStats() {
   return { total, correct, wrong: total - correct };
 }
 
-export async function getReviewQuestions() {
-  const now = new Date();
-  return prisma.question.findMany({
-    where: {
-      nextReviewAt: { lte: now },
-    },
-    include: {
-      category: true,
-      knowledgePoints: { include: { knowledge: true } },
-    },
-    orderBy: { nextReviewAt: "asc" },
-  });
-}
-
-export async function getReviewStats() {
-  const now = new Date();
-  const dueCount = await prisma.question.count({
-    where: { nextReviewAt: { lte: now } },
-  });
-  const scheduledCount = await prisma.question.count({
-    where: { nextReviewAt: { not: null } },
-  });
-  return { dueCount, scheduledCount };
-}
-
-export async function getFlashcards(categoryId?: string) {
-  return prisma.knowledgePoint.findMany({
-    where: categoryId ? { categoryId } : undefined,
-    include: { category: true },
-    orderBy: { title: "asc" },
-  });
-}
-
 export async function getExportData(categoryId?: string) {
   const questions = await prisma.question.findMany({
     where: categoryId ? { categoryId } : undefined,
     include: {
       category: true,
-      knowledgePoints: { include: { knowledge: true } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -399,113 +332,9 @@ export async function getQuestionsByTag(tag: string) {
     where: { tags: { has: tag } },
     include: {
       category: true,
-      knowledgePoints: { include: { knowledge: true } },
     },
     orderBy: { createdAt: "desc" },
   });
-}
-
-// --- Learning Calendar ---
-export async function getLearningCalendar() {
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-  const attempts = await prisma.practiceAttempt.findMany({
-    where: { createdAt: { gte: sixMonthsAgo } },
-    select: { createdAt: true, isCorrect: true },
-    orderBy: { createdAt: "asc" },
-  });
-
-  const map = new Map<string, { count: number; correct: number }>();
-  for (const a of attempts) {
-    const day = a.createdAt.toISOString().slice(0, 10);
-    const entry = map.get(day) || { count: 0, correct: 0 };
-    entry.count++;
-    if (a.isCorrect) entry.correct++;
-    map.set(day, entry);
-  }
-
-  return Object.fromEntries(map);
-}
-
-// --- AI Generate Questions ---
-export interface GeneratedQuestion {
-  content: string;
-  options: Record<string, string>;
-  correctAnswer: string;
-  explanation: string;
-  category: string;
-  knowledgePoints?: { title: string; description: string }[];
-}
-
-export async function generateQuestions(topic: string, count: number = 5): Promise<GeneratedQuestion[]> {
-  const { openai, SYSTEM_PROMPT } = await import("@/lib/openai");
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `請針對「${topic}」這個主題，出 ${count} 題護理師考試的選擇題（繁體中文，四選一）。題目要有鑑別度，涵蓋不同面向。請提供答案和解析。`,
-      },
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.7,
-    max_tokens: 16384,
-  });
-
-  const text = response.choices[0]?.message?.content;
-  if (!text) throw new Error("AI 未回傳任何結果");
-
-  const parsed = JSON.parse(text);
-  const questions: GeneratedQuestion[] = Array.isArray(parsed) ? parsed : parsed.questions ?? [parsed];
-  return questions;
-}
-
-export async function saveGeneratedQuestions(questions: GeneratedQuestion[]) {
-  const results = [];
-  for (const q of questions) {
-    const category = await prisma.category.upsert({
-      where: { name: q.category },
-      update: {},
-      create: { name: q.category },
-    });
-
-    const existing = await prisma.question.findFirst({
-      where: { content: q.content },
-    });
-    if (existing) continue;
-
-    const question = await prisma.question.create({
-      data: {
-        content: q.content,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-        explanation: q.explanation,
-        categoryId: category.id,
-        tags: ["AI出題"],
-      },
-    });
-
-    for (const kp of q.knowledgePoints || []) {
-      let knowledgePoint = await prisma.knowledgePoint.findFirst({
-        where: { title: kp.title, categoryId: category.id },
-      });
-      if (!knowledgePoint) {
-        knowledgePoint = await prisma.knowledgePoint.create({
-          data: { title: kp.title, description: kp.description, categoryId: category.id },
-        });
-      }
-      await prisma.questionKnowledge.create({
-        data: { questionId: question.id, knowledgeId: knowledgePoint.id },
-      });
-    }
-
-    results.push(question);
-  }
-
-  return results;
 }
 
 // --- Notes ---

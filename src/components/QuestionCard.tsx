@@ -23,13 +23,6 @@ import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
-interface KnowledgePoint {
-  knowledge: {
-    id: string;
-    title: string;
-    description: string;
-  };
-}
 
 interface QuestionCardProps {
   question: {
@@ -41,12 +34,12 @@ interface QuestionCardProps {
     isBookmarked: boolean;
     tags?: string[];
     category: { name: string };
-    knowledgePoints: KnowledgePoint[];
   };
+  defaultCollapsed?: boolean;
 }
 
-export function QuestionCard({ question }: QuestionCardProps) {
-  const [expanded, setExpanded] = useState(false);
+export function QuestionCard({ question, defaultCollapsed = false }: QuestionCardProps) {
+  const [expanded, setExpanded] = useState(!defaultCollapsed);
   const [bookmarked, setBookmarked] = useState(question.isBookmarked);
   const [editing, setEditing] = useState(false);
   const [answer, setAnswer] = useState(question.correctAnswer);
@@ -67,10 +60,6 @@ export function QuestionCard({ question }: QuestionCardProps) {
       correctAnswer: answer,
       explanation: question.explanation,
       category: question.category.name,
-      knowledgePoints: question.knowledgePoints.map(({ knowledge }) => ({
-        title: knowledge.title,
-        description: knowledge.description,
-      })),
     });
   }
 
@@ -208,78 +197,65 @@ export function QuestionCard({ question }: QuestionCardProps) {
             點擊正確的選項來修正答案
           </p>
         )}
-        <div className="grid gap-1.5">
-          {Object.entries(options).map(([key, value]) => (
-            <div
-              key={key}
-              onClick={editing ? () => handleSaveAnswer(key) : undefined}
-              className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                key === answer
-                  ? "border-green-500/50 bg-green-50 dark:bg-green-950/30 font-medium text-green-800 dark:text-green-300"
-                  : ""
-              } ${
-                editing
-                  ? "cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                  : ""
-              }`}
-            >
-              <span className="font-medium">{key}.</span> {value}
-            </div>
-          ))}
-        </div>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full"
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? (
-            <>
-              <ChevronUp className="mr-1 h-4 w-4" /> 收起解析
-            </>
-          ) : (
-            <>
-              <ChevronDown className="mr-1 h-4 w-4" /> 查看解析與知識點
-            </>
-          )}
-        </Button>
-
-        {expanded && (
-          <div className="space-y-3 rounded-lg bg-muted/50 p-3">
-            {question.explanation && (
-              <div>
-                <p className="mb-1 text-xs font-semibold text-muted-foreground">解析</p>
-                <p className="text-sm leading-relaxed">{question.explanation}</p>
-              </div>
-            )}
-            {question.knowledgePoints.length > 0 && (
-              <div>
-                <p className="mb-1.5 text-xs font-semibold text-muted-foreground">
-                  相關知識點
-                </p>
-                <div className="space-y-2">
-                  {question.knowledgePoints.map(({ knowledge }) => (
-                    <div key={knowledge.id} className="rounded-md border bg-background p-2.5">
-                      <p className="text-sm font-medium">{knowledge.title}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">
-                        {knowledge.description}
-                      </p>
-                    </div>
-                  ))}
+        
+        {expanded ? (
+          <div className="space-y-3">
+            <div className="grid gap-1.5">
+              {Object.entries(options).map(([key, value]) => (
+                <div
+                  key={key}
+                  onClick={editing ? () => handleSaveAnswer(key) : undefined}
+                  className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                    key === answer
+                      ? "border-green-500/50 bg-green-50 dark:bg-green-950/30 font-medium text-green-800 dark:text-green-300"
+                      : ""
+                  } ${
+                    editing
+                      ? "cursor-pointer hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                      : ""
+                  }`}
+                >
+                  <span className="font-medium">{key}.</span> {value}
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
+
+            <div className="space-y-3 rounded-lg bg-muted/50 p-3">
+              {question.explanation && (
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">解析</p>
+                  <p className="text-sm leading-relaxed">{question.explanation}</p>
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={handleAskAI}
+              >
+                <MessageCircleQuestion className="mr-1.5 h-4 w-4" />
+                問 AI 助教
+              </Button>
+            </div>
+
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               className="w-full"
-              onClick={handleAskAI}
+              onClick={() => setExpanded(false)}
             >
-              <MessageCircleQuestion className="mr-1.5 h-4 w-4" />
-              問 AI 助教
+              <ChevronUp className="mr-1 h-4 w-4" /> 收起詳情
             </Button>
           </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full"
+            onClick={() => setExpanded(true)}
+          >
+            <ChevronDown className="mr-1 h-4 w-4" /> 查看詳情 (選項、答案、解析)
+          </Button>
         )}
       </CardContent>
       <ConfirmDialog

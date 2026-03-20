@@ -9,13 +9,11 @@ export interface QuestionContext {
   correctAnswer: string;
   explanation: string | null;
   category: string;
-  knowledgePoints: { title: string; description: string }[];
 }
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-  imageUrl?: string;
 }
 
 interface ChatContextValue {

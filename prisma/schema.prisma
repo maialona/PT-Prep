@@ -12,7 +12,18 @@ model Category {
   id              String           @id @default(uuid())
   name            String           @unique
   questions       Question[]
-  knowledgePoints KnowledgePoint[]
+}
+
+model Exam {
+  id         String     @id @default(uuid())
+  year       Int
+  subject    String
+  fileName   String?    @map("file_name")
+  questions  Question[]
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  @@unique([year, subject])
+  @@map("exams")
 }
 
 model Question {
@@ -23,14 +34,11 @@ model Question {
   explanation     String?
   categoryId      String              @map("category_id")
   category        Category            @relation(fields: [categoryId], references: [id])
+  examId          String?             @map("exam_id")
+  exam            Exam?               @relation(fields: [examId], references: [id])
   isBookmarked    Boolean             @default(false) @map("is_bookmarked")
   createdAt       DateTime            @default(now()) @map("created_at")
-  nextReviewAt    DateTime?           @map("next_review_at")
-  easeFactor      Float               @default(2.5) @map("ease_factor")
-  srsInterval     Int                 @default(0) @map("srs_interval")
-  repetitions     Int                 @default(0)
   tags            String[]            @default([])
-  knowledgePoints QuestionKnowledge[]
   attempts        PracticeAttempt[]
 
   @@map("questions")
@@ -47,27 +55,6 @@ model PracticeAttempt {
   @@map("practice_attempts")
 }
 
-model KnowledgePoint {
-  id          String              @id @default(uuid())
-  title       String
-  description String
-  categoryId  String              @map("category_id")
-  category    Category            @relation(fields: [categoryId], references: [id])
-  questions   QuestionKnowledge[]
-
-  @@map("knowledge_points")
-}
-
-model QuestionKnowledge {
-  questionId  String         @map("question_id")
-  knowledgeId String         @map("knowledge_id")
-  question    Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  knowledge   KnowledgePoint @relation(fields: [knowledgeId], references: [id], onDelete: Cascade)
-
-  @@id([questionId, knowledgeId])
-  @@map("question_knowledge")
-}
-
 model Note {
   id         String   @id @default(uuid())
   title      String
@@ -77,15 +64,4 @@ model Note {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("notes")
-}
-
-model Image {
-  id        String   @id @default(uuid())
-  title     String
-  category  String
-  data      String   // base64 data URL
-  source    String   // "chat" | "upload"
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("images")
 }

@@ -5,10 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
-  Brain, BookOpen, MessageCircle, Notebook,
-  Sun, Moon, Dumbbell, Clock, Layers,
-  Menu, X, Home, AlertTriangle, ImageIcon, FileDown,
-  Wand2, CalendarDays, Upload,
+  BookOpen, MessageCircle, Notebook,
+  Sun, Moon, Dumbbell, CalendarDays,
+  Menu, X, Home, AlertTriangle, FileDown,
+  Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,27 +16,22 @@ import { useChat } from "@/contexts/ChatContext";
 
 const navLinks = [
   { href: "/", label: "首頁", icon: Home },
-  { href: "/knowledge", label: "知識庫", icon: BookOpen },
-  { href: "/practice", label: "練習", icon: Dumbbell },
-  { href: "/review", label: "複習", icon: Clock },
-  { href: "/flashcards", label: "卡片", icon: Layers },
+  { href: "/practice", label: "開始練習", icon: Dumbbell },
+  { href: "/exams", label: "歷屆試題", icon: CalendarDays },
+  { href: "/questions", label: "題庫", icon: BookOpen },
   { href: "/notes", label: "筆記", icon: Notebook },
 ];
 
 const moreLinks = [
   { href: "/wrong", label: "錯題本", icon: AlertTriangle },
-  { href: "/generate", label: "AI 出題", icon: Wand2 },
-  { href: "/calendar", label: "學習日曆", icon: CalendarDays },
   { href: "/", label: "匯入題目", icon: Upload, hash: "#import" },
-  { href: "/gallery", label: "圖片庫", icon: ImageIcon },
   { href: "/export", label: "匯出", icon: FileDown },
 ];
 
 const mobileTabLinks = [
   { href: "/", label: "首頁", icon: Home },
-  { href: "/knowledge", label: "知識庫", icon: BookOpen },
   { href: "/practice", label: "練習", icon: Dumbbell },
-  { href: "/review", label: "複習", icon: Clock },
+  { href: "/wrong", label: "錯題", icon: AlertTriangle },
 ];
 
 export function Navbar() {
@@ -50,8 +45,9 @@ export function Navbar() {
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex h-14 max-w-5xl items-center px-4">
           <Link href="/" className="mr-6 flex items-center gap-2 font-bold shrink-0">
-            <Brain className="h-5 w-5 text-primary" />
-            <span className="hidden sm:inline">A&P 知識萃取</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/PWA192x192.png" alt="Logo" className="h-6 w-6 rounded-md" />
+            <span className="hidden sm:inline">PT-Prep 物理治療國考</span>
           </Link>
 
           {/* Desktop nav */}
